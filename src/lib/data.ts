@@ -26,10 +26,7 @@ export async function fetchRole(): Promise<"admin" | "employee" | null> {
 }
 
 export async function fetchSettings(): Promise<Settings> {
-  const { data } = await supabase
-    .from("settings")
-    .select("price_per_row, place_a_capacity, place_b_capacity, place_a_sellable, place_b_sellable")
-    .maybeSingle();
+  const { data } = await supabase.from("settings").select("*").maybeSingle();
   if (!data) return DEFAULT_SETTINGS;
   return {
     price_per_row: Number(data.price_per_row),
@@ -37,7 +34,39 @@ export async function fetchSettings(): Promise<Settings> {
     place_b_capacity: data.place_b_capacity,
     place_a_sellable: data.place_a_sellable,
     place_b_sellable: data.place_b_sellable,
+    auto_release_hours: data.auto_release_hours ?? 17,
+    auto_release_enabled: data.auto_release_enabled ?? true,
+    rows_released_at: data.rows_released_at ?? null,
+    checklist_auto_reset: data.checklist_auto_reset ?? true,
   };
+}
+
+export async function fetchSalesFrom(since: Date): Promise<Sale[]> {
+  const { data, error } = await supabase
+    .from("sales")
+    .select("*")
+    .gte("created_at", since.toISOString())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Sale[];
+}
+
+export type EmployeeAccount = {
+  id: string;
+  user_id: string;
+  email: string;
+  password: string;
+  full_name: string | null;
+  created_at: string;
+};
+
+export async function fetchEmployeeAccounts(): Promise<EmployeeAccount[]> {
+  const { data, error } = await supabase
+    .from("employee_credentials")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as EmployeeAccount[];
 }
 
 export async function fetchTodaySales(): Promise<Sale[]> {
