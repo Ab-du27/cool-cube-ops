@@ -70,6 +70,36 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_credentials: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          password: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          password: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          password?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -132,30 +162,42 @@ export type Database = {
       }
       settings: {
         Row: {
+          auto_release_enabled: boolean
+          auto_release_hours: number
+          checklist_auto_reset: boolean
           id: boolean
           place_a_capacity: number
           place_a_sellable: number
           place_b_capacity: number
           place_b_sellable: number
           price_per_row: number
+          rows_released_at: string | null
           updated_at: string
         }
         Insert: {
+          auto_release_enabled?: boolean
+          auto_release_hours?: number
+          checklist_auto_reset?: boolean
           id?: boolean
           place_a_capacity?: number
           place_a_sellable?: number
           place_b_capacity?: number
           place_b_sellable?: number
           price_per_row?: number
+          rows_released_at?: string | null
           updated_at?: string
         }
         Update: {
+          auto_release_enabled?: boolean
+          auto_release_hours?: number
+          checklist_auto_reset?: boolean
           id?: boolean
           place_a_capacity?: number
           place_a_sellable?: number
           place_b_capacity?: number
           place_b_sellable?: number
           price_per_row?: number
+          rows_released_at?: string | null
           updated_at?: string
         }
         Relationships: []
