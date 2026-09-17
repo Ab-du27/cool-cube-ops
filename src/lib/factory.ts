@@ -4,6 +4,10 @@ export type Settings = {
   place_b_capacity: number;
   place_a_sellable: number;
   place_b_sellable: number;
+  auto_release_hours: number;
+  auto_release_enabled: boolean;
+  rows_released_at: string | null;
+  checklist_auto_reset: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -12,12 +16,28 @@ export const DEFAULT_SETTINGS: Settings = {
   place_b_capacity: 48,
   place_a_sellable: 28,
   place_b_sellable: 42,
+  auto_release_hours: 17,
+  auto_release_enabled: true,
+  rows_released_at: null,
+  checklist_auto_reset: true,
 };
 
 export function startOfToday(): Date {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+/**
+ * Moment from which sales still occupy rows. Rows sold before this are free again,
+ * either because the automatic release window passed or the manager released them.
+ */
+export function rowsActiveSince(settings?: Settings | null): Date {
+  const base = settings?.auto_release_enabled
+    ? new Date(Date.now() - (settings.auto_release_hours || 17) * 3600 * 1000)
+    : startOfToday();
+  const released = settings?.rows_released_at ? new Date(settings.rows_released_at) : null;
+  return released && released > base ? released : base;
 }
 
 /** Saturday-based week start, returned as YYYY-MM-DD. */

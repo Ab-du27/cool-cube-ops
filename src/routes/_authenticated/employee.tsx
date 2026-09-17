@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Circle, Plus } from "lucide-react";
+import { CheckCircle2, Circle, Calculator, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { AppShell, StatCard } from "@/components/AppShell";
@@ -14,11 +14,12 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   fetchChecklist,
   fetchProfiles,
+  fetchSalesFrom,
   fetchSettings,
   fetchTodaySales,
   type Sale,
 } from "@/lib/data";
-import { formatIQD, formatTime, weekStart } from "@/lib/factory";
+import { formatIQD, formatTime, rowsActiveSince, weekStart } from "@/lib/factory";
 import { useApp } from "@/lib/i18n";
 
 export const Route = createFileRoute("/_authenticated/employee")({
@@ -43,12 +44,18 @@ function EmployeePage() {
           <TabsTrigger value="sales" className="flex-1">
             {t("sales")}
           </TabsTrigger>
+          <TabsTrigger value="calculator" className="flex-1">
+            {t("calculator")}
+          </TabsTrigger>
           <TabsTrigger value="checklist" className="flex-1">
             {t("checklist")}
           </TabsTrigger>
         </TabsList>
         <TabsContent value="sales">
           <SalesTab />
+        </TabsContent>
+        <TabsContent value="calculator">
+          <CalculatorTab />
         </TabsContent>
         <TabsContent value="checklist">
           <ChecklistTab />
@@ -62,7 +69,14 @@ function SalesTab() {
   const { t } = useApp();
   const queryClient = useQueryClient();
   const settings = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
-  const sales = useQuery({ queryKey: ["sales", "today"], queryFn: fetchTodaySales });
+  const s = settings.data;
+
+  const activeSales = useQuery({
+    queryKey: ["sales", "active", s?.rows_released_at, s?.auto_release_enabled, s?.auto_release_hours],
+    queryFn: () => fetchSalesFrom(rowsActiveSince(s)),
+    enabled: !!s,
+  });
+  const todaySales = useQuery({ queryKey: ["sales", "today"], queryFn: fetchTodaySales });
 
   const [buyer, setBuyer] = useState("");
   const [rows, setRows] = useState("1");
@@ -71,9 +85,8 @@ function SalesTab() {
   const [emergency, setEmergency] = useState(false);
 
   const sold = (p: "a" | "b") =>
-    (sales.data ?? []).filter((s) => s.place === p).reduce((sum, s) => sum + s.rows_count, 0);
+    (activeSales.data ?? []).filter((x) => x.place === p).reduce((sum, x) => sum + x.rows_count, 0);
 
-  const s = settings.data;
   const remainingA = (s?.place_a_sellable ?? 28) - sold("a");
   const remainingB = (s?.place_b_sellable ?? 42) - sold("b");
 
@@ -104,8 +117,6 @@ function SalesTab() {
     onError: (error) => toast.error(error instanceof Error ? error.message : t("errorTitle")),
   });
 
-  const totalToday = (sales.data ?? []).reduce((sum, x) => sum + Number(x.total_iqd), 0);
-
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-3">
@@ -122,9 +133,9 @@ function SalesTab() {
           tone={remainingB <= 0 ? "destructive" : "default"}
         />
         <StatCard
-          label={t("todaySales")}
-          value={`${formatIQD(totalToday)} ${t("iqd")}`}
-          hint={`${sold("a") + sold("b")} ${t("rows")}`}
+          label={t("rowsSoldToday")}
+          value={`${sold("a") + sold("b")}`}
+          hint={`${sold("a")} + ${sold("b")}`}
           tone="success"
         />
       </div>
@@ -191,7 +202,58 @@ function SalesTab() {
         </div>
       </form>
 
-      <SalesList sales={sales.data ?? []} />
+      <SalesList sales={todaySales.data ?? []} />
+    </div>
+  );
+}
+
+function CalculatorTab() {
+  const { t } = useApp();
+  const settings = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
+  const price = settings.data?.price_per_row ?? 0;
+  const [rows, setRows] = useState("1");
+  const total = (Number(rows) || 0) * price;
+
+  return (
+    <div className="frost-panel space-y-5 p-5">
+      <div className="flex items-center gap-2">
+        <Calculator className="size-5 text-primary" />
+        <div>
+          <h2 className="font-bold">{t("calculator")}</h2>
+          <p className="text-xs text-muted-foreground">{t("calcHint")}</p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="calcRows">{t("rowsCount")}</Label>
+        <Input
+          id="calcRows"
+          type="number"
+          min={0}
+          dir="ltr"
+          value={rows}
+          onChange={(e) => setRows(e.target.value)}
+        />
+      </div>
+
+      <div className="rounded-xl bg-muted/60 p-4 text-center">
+        <p className="text-xs text-muted-foreground">
+          {`1 ${t("rows")} = ${formatIQD(price)} ${t("iqd")}`}
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">{t("result")}</p>
+        <p className="text-3xl font-bold text-primary" dir="ltr">
+          {formatIQD(total)}
+        </p>
+        <p className="text-xs text-muted-foreground">{t("iqd")}</p>
+      </div>
+
+      <div className="grid grid-cols-4 gap-2">
+        {[1, 5, 10, 12].map((n) => (
+          <Button key={n} type="button" variant="secondary" onClick={() => setRows(String(n))}>
+            {n}
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -213,14 +275,9 @@ function SalesList({ sales }: { sales: Sale[] }) {
               {sale.emergency ? ` · ${t("emergency")}` : ""}
             </p>
           </div>
-          <div className="text-end">
-            <p className="font-bold">
-              {formatIQD(Number(sale.total_iqd))} {t("iqd")}
-            </p>
-            <p className={`text-xs ${sale.paid ? "text-success" : "text-destructive"}`}>
-              {sale.paid ? t("paid") : t("notPaid")}
-            </p>
-          </div>
+          <p className={`text-xs font-semibold ${sale.paid ? "text-success" : "text-destructive"}`}>
+            {sale.paid ? t("paid") : t("notPaid")}
+          </p>
         </div>
       ))}
     </div>

@@ -32,10 +32,8 @@ export const Route = createFileRoute("/")({
 function AuthPage() {
   const { t, lang, setLang, theme, toggleTheme } = useApp();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"in" | "up">("in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -54,19 +52,8 @@ function AuthPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      if (mode === "up") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: { full_name: fullName },
-          },
-        });
-        if (error) throw error;
-      }
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) throw signInError;
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
       const role = await fetchRole();
       navigate({ to: role === "admin" ? "/admin" : "/employee", replace: true });
     } catch (error) {
@@ -101,36 +88,7 @@ function AuthPage() {
           </div>
 
           <form onSubmit={submit} className="frost-panel space-y-4 p-6">
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant={mode === "in" ? "default" : "secondary"}
-                className="flex-1"
-                onClick={() => setMode("in")}
-              >
-                {t("signIn")}
-              </Button>
-              <Button
-                type="button"
-                variant={mode === "up" ? "default" : "secondary"}
-                className="flex-1"
-                onClick={() => setMode("up")}
-              >
-                {t("signUp")}
-              </Button>
-            </div>
-
-            {mode === "up" ? (
-              <div className="space-y-2">
-                <Label htmlFor="fullName">{t("fullName")}</Label>
-                <Input
-                  id="fullName"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                />
-              </div>
-            ) : null}
+            <h2 className="text-lg font-bold">{t("signIn")}</h2>
 
             <div className="space-y-2">
               <Label htmlFor="email">{t("email")}</Label>
@@ -158,8 +116,10 @@ function AuthPage() {
             </div>
 
             <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? t("loading") : mode === "in" ? t("signIn") : t("signUp")}
+              {busy ? t("loading") : t("signIn")}
             </Button>
+
+            <p className="text-center text-xs text-muted-foreground">{t("onlyAdminCreates")}</p>
           </form>
         </div>
       </div>
